@@ -1,69 +1,107 @@
 # Human-in-the-Loop MCP Server
 
-An MCP (Model Context Protocol) server that allows AI assistants to ask questions to humans via Discord.
+A Discord bot that enables AI assistants to ask questions to humans in real-time through the Model Context Protocol (MCP).
 
-<img width="845" alt="Screenshot 2025-06-23 at 18 25 43" src="https://github.com/user-attachments/assets/dcdbb1a7-cb71-446e-b44d-bfe637059acb" />
+<img width="845" alt="Human-in-the-Loop Discord interaction" src="https://github.com/user-attachments/assets/dcdbb1a7-cb71-446e-b44d-bfe637059acb" />
 
-## Overview
+## What This Does
 
-This MCP server is used when AI assistants need human input or judgment during their work. For example:
+This MCP server creates a bridge between AI assistants (like Claude) and humans via Discord. When an AI needs human input, it can ask questions directly in Discord and wait for responses.
 
-- When having an LLM create documentation, the AI designs the structure while humans provide specific content
-- When the AI needs confirmation on uncertain decisions
-- When specialized knowledge or personal information is required
+**Example use cases:**
+- AI needs project-specific information only you know
+- Confirmation before executing sensitive operations  
+- Gathering requirements or preferences during development
+- Getting feedback on generated content
+- Handling ambiguous instructions that need clarification
 
-## Requirements
+## Quick Start (5 minutes)
 
-- Rust (1.70 or higher)
-- Discord account and bot
-- MCP-compatible AI client (Claude Desktop, Copilot Edits, etc.)
-
-## Setup
+### Prerequisites
+- Rust 1.70+ ([install here](https://rustup.rs/))
+- Discord account
+- A Discord server where you have admin permissions
 
 ### 1. Create Discord Bot
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a new application
-3. Create a bot in the Bot section and obtain the token
-4. Set required permissions:
+2. Click "New Application" → Name it (e.g., "AI Assistant Helper")
+3. Go to "Bot" section in left sidebar
+4. Click "Reset Token" → Copy the token (you'll need this!)
+5. Under "Privileged Gateway Intents", enable:
+   - ✅ MESSAGE CONTENT INTENT (required!)
+6. Under "Bot Permissions", select:
    - Send Messages
-   - Create Public Threads
+   - Create Public Threads  
    - Read Message History
-5. Enable privileged gateway intents in Bot section:
-   - Message Content Intent
+   - View Channels
 
-### 2. Install
+### 2. Add Bot to Your Server
+
+1. Still in Discord Developer Portal, go to "OAuth2" → "URL Generator"
+2. Select scopes: `bot`
+3. Select same permissions as above
+4. Copy the generated URL and open it in browser
+5. Select your server and authorize
+
+### 3. Get Required IDs
+
+Enable Discord Developer Mode:
+- Desktop: Settings → Advanced → Developer Mode → ON
+- Mobile: Settings → Advanced → Developer Mode
+
+Then:
+- **Channel ID**: Right-click any text channel → "Copy Channel ID"
+- **Your User ID**: Right-click your username → "Copy User ID"
+
+### 4. Install and Test
 
 ```bash
-cargo install --git https://github.com/KOBA789/human-in-the-loop.git
+# Clone and build
+git clone https://github.com/KOBA789/human-in-the-loop.git
+cd human-in-the-loop
+cargo build --release
+
+# Create test config
+cat > .env.test << EOF
+DISCORD_TOKEN=YOUR_BOT_TOKEN_HERE
+DISCORD_CHANNEL_ID=YOUR_CHANNEL_ID_HERE  
+DISCORD_USER_ID=YOUR_USER_ID_HERE
+EOF
+
+# Test the connection
+export $(grep -v '^#' .env.test | xargs)
+cargo run --bin human-in-the-loop
 ```
 
-## Connecting with MCP Clients
+If successful, the bot should appear online in your Discord server.
 
-### Claude Desktop Configuration
+## Configuration for AI Assistants
 
-Add the following to `claude_desktop_config.json`:
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "human-in-the-loop": {
-      "command": "human-in-the-loop",
+      "command": "/path/to/human-in-the-loop",
       "args": [
-        "--discord-channel-id", "channel-id",
-        "--discord-user-id", "user-id"
+        "--discord-channel-id", "YOUR_CHANNEL_ID",
+        "--discord-user-id", "YOUR_USER_ID"
       ],
       "env": {
-        "DISCORD_TOKEN": "your-discord-bot-token"
+        "DISCORD_TOKEN": "YOUR_BOT_TOKEN"
       }
     }
   }
 }
 ```
 
-### Claude Code Configuration
+### Claude Code (claude.ai/code)
 
-For Claude Code (claude.ai/code), add to your MCP settings:
+Add to MCP settings:
 
 ```json
 {
@@ -71,52 +109,158 @@ For Claude Code (claude.ai/code), add to your MCP settings:
     "human-in-the-loop": {
       "command": "human-in-the-loop",
       "args": [
-        "--discord-channel-id", "channel-id",
-        "--discord-user-id", "user-id"
+        "--discord-channel-id", "YOUR_CHANNEL_ID",
+        "--discord-user-id", "YOUR_USER_ID"
       ]
     }
   }
 }
 ```
 
-Set the Discord token as an environment variable before running Claude Code:
-
+Then set environment variable before starting Claude:
 ```bash
-export DISCORD_TOKEN="your-discord-bot-token"
+export DISCORD_TOKEN="YOUR_BOT_TOKEN"
 claude
 ```
 
-Note: The server automatically reads the Discord token from the `DISCORD_TOKEN` environment variable. You can also pass it via `--discord-token` argument if needed.
-
-### Usage
-
-AI assistants can ask questions to humans using the `ask_human` tool:
-
-```
-Human: Please create a documentation outline. You can ask the human as you need.
-Assistant: I'll create a documentation outline. Let me ask you some questions first.
-[Uses ask_human tool]
-```
-
-The AI posts questions in Discord and mentions the specified user. When the user replies in Discord, the response is returned to the AI.
-
 ## How It Works
 
-1. AI assistant calls the `ask_human` tool
-2. MCP server creates a thread in the specified Discord channel (or uses existing thread)
-3. Posts the question and mentions the specified user
-4. Waits for user's reply
-5. Returns the reply content to the AI assistant
+1. **AI asks a question**: When the AI uses the `ask_human` tool, it sends a question
+2. **Bot creates thread**: A new thread is created in your Discord channel (or reuses existing)
+3. **You get notified**: Bot mentions you with the question
+4. **You respond**: Type your answer in the thread
+5. **AI receives answer**: Your response is sent back to the AI
 
-## Finding Discord IDs
+### Example Interaction
 
-### Getting Channel ID
-1. Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
-2. Right-click on channel → "Copy ID"
+```
+You: "Create a README for my project"
+AI: "I'll help create a README. Let me ask you some questions about your project."
+[AI uses ask_human tool]
 
-### Getting User ID
-1. Right-click on user → "Copy ID"
+Discord:
+Bot: @YourName What is the main purpose of your project?
+You: It's a tool for managing Discord bots
+[Bot returns this to AI]
 
-## Roadmap
+AI: "Great! Let me ask about the key features..."
+```
 
-- **Future Migration to MCP Elicitation**: Once MCP's Elicitation implementation becomes more widespread and standardized, we plan to migrate the UI from Discord to native MCP Elicitation. This will provide a more integrated experience directly within MCP-compatible clients.
+## Testing Your Setup
+
+### 1. Basic Connection Test
+
+```bash
+# Create test script
+cat > test_connection.py << 'EOF'
+import requests
+import os
+
+token = os.environ.get('DISCORD_TOKEN')
+headers = {'Authorization': f'Bot {token}'}
+r = requests.get('https://discord.com/api/v10/users/@me', headers=headers)
+
+if r.status_code == 200:
+    print(f"✅ Bot connected: {r.json()['username']}#{r.json()['discriminator']}")
+else:
+    print(f"❌ Error: {r.text}")
+EOF
+
+python3 test_connection.py
+```
+
+### 2. Full MCP Test
+
+```bash
+# Download test script
+curl -O https://raw.githubusercontent.com/KOBA789/human-in-the-loop/main/test_final.py
+python3 test_final.py
+```
+
+This will:
+- Initialize MCP connection
+- List available tools
+- Send a test question to Discord
+- Wait for your response
+
+## Troubleshooting
+
+### Bot not appearing online
+- Verify token is correct (no extra spaces)
+- Check bot was added to server with correct permissions
+- Ensure MESSAGE CONTENT INTENT is enabled
+
+### "Cannot execute action on this channel type" error
+- Make sure channel is a regular text channel (not forum/announcement)
+- Bot needs "Create Public Threads" permission
+- Try a different channel
+
+### No response from bot
+- Check bot has "View Channel" permission
+- Verify channel ID is correct
+- Ensure you're replying in the thread, not main channel
+
+### "Connection closed" errors
+- Token might be invalid or regenerated
+- Check environment variables are set correctly
+- Try running with `--discord-token` flag directly
+
+## Command Line Options
+
+```bash
+human-in-the-loop [OPTIONS]
+
+OPTIONS:
+    --discord-token <TOKEN>          Discord bot token (or use DISCORD_TOKEN env)
+    --discord-channel-id <ID>        Channel ID for creating threads
+    --discord-user-id <ID>           User ID to mention in questions
+    -h, --help                       Print help information
+```
+
+## Building from Source
+
+```bash
+# Clone repository
+git clone https://github.com/KOBA789/human-in-the-loop.git
+cd human-in-the-loop
+
+# Build release version
+cargo build --release
+
+# Binary will be at: target/release/human-in-the-loop
+```
+
+## Security Notes
+
+- Never commit your Discord token to version control
+- Use environment variables or secure secret management
+- Bot token gives full access to your bot - keep it safe
+- Consider using separate Discord servers for testing
+
+## Common Issues and Solutions
+
+| Issue | Solution |
+|-------|----------|
+| Bot offline | Check token, ensure bot added to server |
+| No threads created | Verify channel permissions, check channel type |
+| Can't find channel | Enable Developer Mode, use right-click → Copy ID |
+| MCP timeout | Ensure bot successfully connected to Discord first |
+| Missing user mention | Verify user ID is correct |
+
+## Contributing
+
+Contributions welcome! Please ensure:
+- Tests pass: `cargo test`
+- Code is formatted: `cargo fmt`
+- No clippy warnings: `cargo clippy`
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Future Plans
+
+- Migration to native MCP Elicitation when standardized
+- Support for multiple concurrent conversations
+- Configurable timeout settings
+- Web dashboard for monitoring

@@ -3,6 +3,10 @@ name = "human-in-the-loop"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "test_discord"
+path = "src/bin/test_discord.rs"
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4.5.40", features = ["derive", "env"] }
